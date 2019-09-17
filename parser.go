@@ -17,7 +17,7 @@ import (
 //     - Some text within the xml document
 //
 type Node struct {
-	kind nodeKind
+	kind NodeKind
 	name xml.Name
 	attr string
 	text []byte
@@ -30,17 +30,22 @@ type Node struct {
 	down []*Node
 }
 
-type nodeKind int
+type NodeKind int
 
 const (
-	anyNode nodeKind = iota
-	startNode
-	endNode
-	attrNode
-	textNode
-	commentNode
-	procInstNode
+	AnyNode NodeKind = iota
+	StartNode
+	EndNode
+	AttrNode
+	TextNode
+	CommentNode
+	ProcInstNode
 )
+
+// Kind returns the type of node as NodeKind
+func (node *Node) Kind() NodeKind {
+	return node.kind
+}
 
 // Name returns the name value of node.
 // Use it to get:
@@ -61,7 +66,7 @@ func (node *Node) Name() xml.Name {
 //     - For processing instruction nodes, the content of the instruction.
 //
 func (node *Node) String() string {
-	if node.kind == attrNode {
+	if node.kind == AttrNode {
 		return node.attr
 	}
 	return string(node.Bytes())
@@ -70,21 +75,21 @@ func (node *Node) String() string {
 // Bytes returns the string value of node as a byte slice.
 // See Node.String for a description of what the string value of a node is.
 func (node *Node) Bytes() []byte {
-	if node.kind == attrNode {
+	if node.kind == AttrNode {
 		return []byte(node.attr)
 	}
-	if node.kind != startNode {
+	if node.kind != StartNode {
 		return node.text
 	}
 	size := 0
 	for i := node.pos; i < node.end; i++ {
-		if node.nodes[i].kind == textNode {
+		if node.nodes[i].kind == TextNode {
 			size += len(node.nodes[i].text)
 		}
 	}
 	text := make([]byte, 0, size)
 	for i := node.pos; i < node.end; i++ {
-		if node.nodes[i].kind == textNode {
+		if node.nodes[i].kind == TextNode {
 			text = append(text, node.nodes[i].text...)
 		}
 	}
@@ -94,10 +99,10 @@ func (node *Node) Bytes() []byte {
 // equals returns whether the string value of node is equal to s,
 // without allocating memory.
 func (node *Node) equals(s string) bool {
-	if node.kind == attrNode {
+	if node.kind == AttrNode {
 		return s == node.attr
 	}
-	if node.kind != startNode {
+	if node.kind != StartNode {
 		if len(s) != len(node.text) {
 			return false
 		}
@@ -110,7 +115,7 @@ func (node *Node) equals(s string) bool {
 	}
 	si := 0
 	for i := node.pos; i < node.end; i++ {
-		if node.nodes[i].kind == textNode {
+		if node.nodes[i].kind == TextNode {
 			for _, c := range node.nodes[i].text {
 				if si >= len(s) {
 					return false
@@ -131,12 +136,12 @@ func (node *Node) contains(s string) (ok bool) {
 	if len(s) == 0 {
 		return true
 	}
-	if node.kind == attrNode {
+	if node.kind == AttrNode {
 		return strings.Contains(node.attr, s)
 	}
 	s0 := s[0]
 	for i := node.pos; i < node.end; i++ {
-		if node.nodes[i].kind == textNode {
+		if node.nodes[i].kind == TextNode {
 			text := node.nodes[i].text
 		NextTry:
 			for ci, c := range text {
@@ -154,7 +159,7 @@ func (node *Node) contains(s string) (ok bool) {
 					return true
 				}
 				for j := i + 1; j < node.end; j++ {
-					if node.nodes[j].kind == textNode {
+					if node.nodes[j].kind == TextNode {
 						for _, c := range node.nodes[j].text {
 							if s[si] != c {
 								continue NextTry
@@ -177,12 +182,12 @@ func (node *Node) startsWith(s string) (ok bool) {
 	if len(s) == 0 {
 		return true
 	}
-	if node.kind == attrNode {
+	if node.kind == AttrNode {
 		return strings.HasPrefix(node.attr, s)
 	}
 	si := 0
 	for i := node.pos; i < node.end; i++ {
-		if node.nodes[i].kind != textNode {
+		if node.nodes[i].kind != TextNode {
 			continue
 		}
 		for _, c := range node.nodes[i].text {
@@ -210,7 +215,7 @@ func ParseDecoder(d *xml.Decoder) (*Node, error) {
 	var text []byte
 
 	// The root node.
-	nodes = append(nodes, Node{kind: startNode})
+	nodes = append(nodes, Node{kind: StartNode})
 
 	for {
 		t, err := d.Token()
@@ -223,16 +228,16 @@ func ParseDecoder(d *xml.Decoder) (*Node, error) {
 		switch t := t.(type) {
 		case xml.EndElement:
 			nodes = append(nodes, Node{
-				kind: endNode,
+				kind: EndNode,
 			})
 		case xml.StartElement:
 			nodes = append(nodes, Node{
-				kind: startNode,
+				kind: StartNode,
 				name: t.Name,
 			})
 			for _, attr := range t.Attr {
 				nodes = append(nodes, Node{
-					kind: attrNode,
+					kind: AttrNode,
 					name: attr.Name,
 					attr: attr.Value,
 				})
@@ -241,21 +246,21 @@ func ParseDecoder(d *xml.Decoder) (*Node, error) {
 			texti := len(text)
 			text = append(text, t...)
 			nodes = append(nodes, Node{
-				kind: textNode,
+				kind: TextNode,
 				text: text[texti : texti+len(t)],
 			})
 		case xml.Comment:
 			texti := len(text)
 			text = append(text, t...)
 			nodes = append(nodes, Node{
-				kind: commentNode,
+				kind: CommentNode,
 				text: text[texti : texti+len(t)],
 			})
 		case xml.ProcInst:
 			texti := len(text)
 			text = append(text, t.Inst...)
 			nodes = append(nodes, Node{
-				kind: procInstNode,
+				kind: ProcInstNode,
 				name: xml.Name{Local: t.Target},
 				text: text[texti : texti+len(t.Inst)],
 			})
@@ -263,7 +268,7 @@ func ParseDecoder(d *xml.Decoder) (*Node, error) {
 	}
 
 	// Close the root node.
-	nodes = append(nodes, Node{kind: endNode})
+	nodes = append(nodes, Node{kind: EndNode})
 
 	stack := make([]*Node, 0, len(nodes))
 	downs := make([]*Node, len(nodes))
@@ -273,20 +278,20 @@ func ParseDecoder(d *xml.Decoder) (*Node, error) {
 
 		switch nodes[pos].kind {
 
-		case startNode, attrNode, textNode, commentNode, procInstNode:
+		case StartNode, AttrNode, TextNode, CommentNode, ProcInstNode:
 			node := &nodes[pos]
 			node.nodes = nodes
 			node.pos = pos
 			if len(stack) > 0 {
 				node.up = stack[len(stack)-1]
 			}
-			if node.kind == startNode {
+			if node.kind == StartNode {
 				stack = append(stack, node)
 			} else {
 				node.end = pos + 1
 			}
 
-		case endNode:
+		case EndNode:
 			node := stack[len(stack)-1]
 			node.end = pos
 			stack = stack[:len(stack)-1]
@@ -297,7 +302,7 @@ func ParseDecoder(d *xml.Decoder) (*Node, error) {
 			for i := node.pos + 1; i < node.end; i++ {
 				if nodes[i].up == node {
 					switch nodes[i].kind {
-					case startNode, textNode, commentNode, procInstNode:
+					case StartNode, TextNode, CommentNode, ProcInstNode:
 						node.down = append(node.down, &nodes[i])
 						downCount++
 					}
@@ -330,19 +335,19 @@ func ParseHTML(r io.Reader) (*Node, error) {
 	n := ns[0]
 
 	// The root node.
-	nodes = append(nodes, Node{kind: startNode})
+	nodes = append(nodes, Node{kind: StartNode})
 
 	for n != nil {
 		switch n.Type {
 		case html.DocumentNode:
 		case html.ElementNode:
 			nodes = append(nodes, Node{
-				kind: startNode,
+				kind: StartNode,
 				name: xml.Name{Local: n.Data, Space: n.Namespace},
 			})
 			for _, attr := range n.Attr {
 				nodes = append(nodes, Node{
-					kind: attrNode,
+					kind: AttrNode,
 					name: xml.Name{Local: attr.Key, Space: attr.Namespace},
 					attr: attr.Val,
 				})
@@ -351,14 +356,14 @@ func ParseHTML(r io.Reader) (*Node, error) {
 			texti := len(text)
 			text = append(text, n.Data...)
 			nodes = append(nodes, Node{
-				kind: textNode,
+				kind: TextNode,
 				text: text[texti : texti+len(n.Data)],
 			})
 		case html.CommentNode:
 			texti := len(text)
 			text = append(text, n.Data...)
 			nodes = append(nodes, Node{
-				kind: commentNode,
+				kind: CommentNode,
 				text: text[texti : texti+len(n.Data)],
 			})
 		}
@@ -370,7 +375,7 @@ func ParseHTML(r io.Reader) (*Node, error) {
 
 		for n != nil {
 			if n.Type == html.ElementNode {
-				nodes = append(nodes, Node{kind: endNode})
+				nodes = append(nodes, Node{kind: EndNode})
 			}
 			if n.NextSibling != nil {
 				n = n.NextSibling
@@ -381,7 +386,7 @@ func ParseHTML(r io.Reader) (*Node, error) {
 	}
 
 	// Close the root node.
-	nodes = append(nodes, Node{kind: endNode})
+	nodes = append(nodes, Node{kind: EndNode})
 
 	stack := make([]*Node, 0, len(nodes))
 	downs := make([]*Node, len(nodes))
@@ -391,20 +396,20 @@ func ParseHTML(r io.Reader) (*Node, error) {
 
 		switch nodes[pos].kind {
 
-		case startNode, attrNode, textNode, commentNode, procInstNode:
+		case StartNode, AttrNode, TextNode, CommentNode, ProcInstNode:
 			node := &nodes[pos]
 			node.nodes = nodes
 			node.pos = pos
 			if len(stack) > 0 {
 				node.up = stack[len(stack)-1]
 			}
-			if node.kind == startNode {
+			if node.kind == StartNode {
 				stack = append(stack, node)
 			} else {
 				node.end = pos + 1
 			}
 
-		case endNode:
+		case EndNode:
 			node := stack[len(stack)-1]
 			node.end = pos
 			stack = stack[:len(stack)-1]
@@ -415,7 +420,7 @@ func ParseHTML(r io.Reader) (*Node, error) {
 			for i := node.pos + 1; i < node.end; i++ {
 				if nodes[i].up == node {
 					switch nodes[i].kind {
-					case startNode, textNode, commentNode, procInstNode:
+					case StartNode, TextNode, CommentNode, ProcInstNode:
 						node.down = append(node.down, &nodes[i])
 						downCount++
 					}

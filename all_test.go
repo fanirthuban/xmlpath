@@ -5,7 +5,7 @@ import (
 	"encoding/xml"
 	"testing"
 
-	"github.com/lajonat/xmlpath"
+	"github.com/fanirthuban/xmlpath"
 	. "gopkg.in/check.v1"
 	"strings"
 )

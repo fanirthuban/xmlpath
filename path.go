@@ -257,7 +257,7 @@ func (s *pathStepState) _next() bool {
 		for s.idx < s.aux {
 			node := &s.node.nodes[s.idx]
 			s.idx++
-			if node.kind == attrNode {
+			if node.kind == AttrNode {
 				continue
 			}
 			if s.step.match(node) {
@@ -273,7 +273,7 @@ func (s *pathStepState) _next() bool {
 		for s.idx < len(s.node.nodes) {
 			node := &s.node.nodes[s.idx]
 			s.idx++
-			if node.kind == attrNode {
+			if node.kind == AttrNode {
 				continue
 			}
 			if s.step.match(node) {
@@ -313,7 +313,7 @@ func (s *pathStepState) _next() bool {
 		for s.idx >= 0 {
 			node := &s.node.nodes[s.idx]
 			s.idx--
-			if node.kind == attrNode {
+			if node.kind == AttrNode {
 				continue
 			}
 			if node == s.node.nodes[s.aux].up {
@@ -359,7 +359,7 @@ func (s *pathStepState) _next() bool {
 		for s.idx < s.aux {
 			node := &s.node.nodes[s.idx]
 			s.idx++
-			if node.kind != attrNode {
+			if node.kind != AttrNode {
 				break
 			}
 			if s.step.match(node) {
@@ -443,13 +443,13 @@ type pathStep struct {
 	root bool
 	axis string
 	name string
-	kind nodeKind
+	kind NodeKind
 	pred predicate
 }
 
 func (step *pathStep) match(node *Node) bool {
-	return node.kind != endNode &&
-		(step.kind == anyNode || step.kind == node.kind) &&
+	return node.kind != EndNode &&
+		(step.kind == AnyNode || step.kind == node.kind) &&
 		(step.name == "*" || node.name.Local == step.name)
 }
 
@@ -509,7 +509,7 @@ func (c *pathCompiler) parsePath() (path *Path, err error) {
 			}
 			step.axis = "attribute"
 			step.name = c.path[mark:c.i]
-			step.kind = attrNode
+			step.kind = AttrNode
 		} else {
 			mark := c.i
 			if c.skipName() {
@@ -519,7 +519,7 @@ func (c *pathCompiler) parsePath() (path *Path, err error) {
 			if step.name == "" {
 				return nil, c.errorf("missing name")
 			} else if step.name == "*" {
-				step.kind = startNode
+				step.kind = StartNode
 			} else if step.name == "." {
 				step.axis = "self"
 				step.name = "*"
@@ -534,7 +534,7 @@ func (c *pathCompiler) parsePath() (path *Path, err error) {
 					c.skipSpaces()
 					switch step.name {
 					case "attribute":
-						step.kind = attrNode
+						step.kind = AttrNode
 					case "self", "child", "parent":
 					case "descendant", "descendant-or-self":
 					case "ancestor", "ancestor-or-self":
@@ -555,16 +555,16 @@ func (c *pathCompiler) parsePath() (path *Path, err error) {
 				}
 				if c.skipByte('(') {
 					c.skipSpaces()
-					conflict := step.kind != anyNode
+					conflict := step.kind != AnyNode
 					switch step.name {
 					case "node":
 						// must be anyNode
 					case "text":
-						step.kind = textNode
+						step.kind = TextNode
 					case "comment":
-						step.kind = commentNode
+						step.kind = CommentNode
 					case "processing-instruction":
-						step.kind = procInstNode
+						step.kind = ProcInstNode
 					default:
 						return nil, c.errorf("unsupported expression: %s()", step.name)
 					}
@@ -578,7 +578,7 @@ func (c *pathCompiler) parsePath() (path *Path, err error) {
 						step.name = "*"
 					} else if err != nil {
 						return nil, c.errorf("%v", err)
-					} else if step.kind == procInstNode {
+					} else if step.kind == ProcInstNode {
 						c.skipSpaces()
 						step.name = literal
 					} else {
@@ -588,8 +588,8 @@ func (c *pathCompiler) parsePath() (path *Path, err error) {
 						return nil, c.errorf("%s() missing ')'", name)
 					}
 					c.skipSpaces()
-				} else if step.name == "*" && step.kind == anyNode {
-					step.kind = startNode
+				} else if step.name == "*" && step.kind == AnyNode {
+					step.kind = StartNode
 				}
 			}
 		}
